@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright (c) 2007-2011, Servigistics, Inc.
+ * Copyright (c) 2007-2012, Servigistics, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,9 +27,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *
- * @copyright Copyright 2007-2011 Servigistics, Inc. (http://servigistics.com)
+ * @copyright Copyright 2007-2012 Servigistics, Inc. (http://servigistics.com)
  * @license http://solr-php-client.googlecode.com/svn/trunk/COPYING New BSD
- * @version $Id: Service.php 59 2011-02-08 20:38:59Z donovan.jimenez $
+ * @version $Id: Service.php 65 2012-07-05 21:29:38Z donovan.jimenez $
  *
  * @package Apache
  * @subpackage Solr
@@ -88,12 +88,12 @@ class Apache_Solr_Service
 	/**
 	 * SVN Revision meta data for this class
 	 */
-	const SVN_REVISION = '$Revision: 59 $';
+	const SVN_REVISION = '$Revision: 65 $';
 
 	/**
 	 * SVN ID meta data for this class
 	 */
-	const SVN_ID = '$Id: Service.php 59 2011-02-08 20:38:59Z donovan.jimenez $';
+	const SVN_ID = '$Id: Service.php 65 2012-07-05 21:29:38Z donovan.jimenez $';
 
 	/**
 	 * Response writer we'll request - JSON. See http://code.google.com/p/solr-php-client/issues/detail?id=6#c1 for reasoning
@@ -118,6 +118,7 @@ class Apache_Solr_Service
 	const PING_SERVLET = 'admin/ping';
 	const UPDATE_SERVLET = 'update';
 	const SEARCH_SERVLET = 'select';
+	const SYSTEM_SERVLET = 'admin/system';
 	const THREADS_SERVLET = 'admin/threads';
 	const EXTRACT_SERVLET = 'update/extract';
 
@@ -165,7 +166,7 @@ class Apache_Solr_Service
 	 *
 	 * @var string
 	 */
-	protected $_pingUrl, $_updateUrl, $_searchUrl, $_threadsUrl;
+	protected $_pingUrl, $_updateUrl, $_searchUrl, $_systemUrl, $_threadsUrl;
 
 	/**
 	 * Keep track of whether our URLs have been constructed
@@ -286,6 +287,7 @@ class Apache_Solr_Service
 		$this->_extractUrl = $this->_constructUrl(self::EXTRACT_SERVLET);
 		$this->_pingUrl = $this->_constructUrl(self::PING_SERVLET);
 		$this->_searchUrl = $this->_constructUrl(self::SEARCH_SERVLET);
+		$this->_systemUrl = $this->_constructUrl(self::SYSTEM_SERVLET, array('wt' => self::SOLR_WRITER));
 		$this->_threadsUrl = $this->_constructUrl(self::THREADS_SERVLET, array('wt' => self::SOLR_WRITER ));
 		$this->_updateUrl = $this->_constructUrl(self::UPDATE_SERVLET, array('wt' => self::SOLR_WRITER ));
 
@@ -458,7 +460,14 @@ class Apache_Solr_Service
 	{
 		$path = trim($path, '/');
 
-		$this->_path = '/' . $path . '/';
+		if (strlen($path) > 0)
+		{
+			$this->_path = '/' . $path . '/';
+		}
+		else
+		{
+			$this->_path = '/';
+		}
 
 		if ($this->_urlsInited)
 		{
@@ -559,7 +568,30 @@ class Apache_Solr_Service
 	{
 		$this->getHttpTransport()->setDefaultTimeout($timeout);
 	}
+	
+	/**
+	 * Convenience method to set authentication credentials on the current HTTP transport implementation
+	 * 
+	 * @param string $username
+	 * @param string $password
+	 */
+	public function setAuthenticationCredentials($username, $password)
+	{
+		$this->getHttpTransport()->setAuthenticationCredentials($username, $password);
+	}
 
+	/**
+	 * Convenience method to set proxy
+	 * 
+	 * @param string $username
+	 * @param string $password
+	 */
+	public function setProxy($proxy, $port, $username = '', $password = '')
+	{
+		$this->getHttpTransport()->setProxy($proxy, $port, $username, $password);
+	}
+	
+	
 	/**
 	 * Set how NamedLists should be formatted in the response data. This mainly effects
 	 * the facet counts format.
@@ -640,6 +672,18 @@ class Apache_Solr_Service
 		{
 			return false;
 		}
+	}
+	
+	/**
+	 * Call the /admin/system servlet and retrieve system information about Solr
+	 * 
+	 * @return Apache_Solr_Response
+	 *
+	 * @throws Apache_Solr_HttpTransportException If an error occurs during the service call
+	 */
+	public function system()
+	{
+		return $this->_sendRawGet($this->_systemUrl);
 	}
 
 	/**
@@ -751,8 +795,8 @@ class Apache_Solr_Service
 
 		foreach ($document as $key => $value)
 		{
-			$key = htmlspecialchars($key, ENT_QUOTES, 'UTF-8');
 			$fieldBoost = $document->getFieldBoost($key);
+			$key = htmlspecialchars($key, ENT_QUOTES, 'UTF-8');
 
 			if (is_array($value))
 			{
